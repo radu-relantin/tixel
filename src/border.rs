@@ -42,20 +42,39 @@ impl Border {
         }
     }
 
-    pub fn render(&self, window_size: (usize, usize)) -> io::Result<()> {
+    // Render the widget based on the window size and debug mode.
+    pub fn render(&self, window_size: (usize, usize), debug: bool) -> io::Result<()> {
+        // If the widget is not visible, return Ok(())
         if !self.visible {
             return Ok(());
         }
 
         let (width, height) = window_size;
 
-        for y in self.padding..(height - self.padding) {
-            for x in self.padding..(width - self.padding) {
-                if x == self.padding
+        // Iterate over each pixel in the window
+        for y in 0..height {
+            for x in 0..width {
+                // Check if the pixel is within the padding
+                if x < self.padding
+                    || x >= width - self.padding
+                    || y < self.padding
+                    || y >= height - self.padding
+                {
+                    // If in debug mode, display a debug marker
+                    if debug {
+                        queue!(io::stdout(), cursor::MoveTo(x as u16, y as u16))?;
+                        queue!(
+                            io::stdout(),
+                            style::SetBackgroundColor(style::Color::DarkGreen)
+                        )?;
+                        queue!(io::stdout(), style::Print(" "))?;
+                    }
+                } else if x == self.padding
                     || x == width - self.padding - 1
                     || y == self.padding
                     || y == height - self.padding - 1
                 {
+                    // Render the border of the widget
                     queue!(io::stdout(), cursor::MoveTo(x as u16, y as u16))?;
                     queue!(
                         io::stdout(),
@@ -66,6 +85,7 @@ impl Border {
                 }
             }
         }
+        // Flush the output to the console
         io::stdout().flush()?;
         Ok(())
     }

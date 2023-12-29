@@ -43,8 +43,8 @@ impl BaseLayer {
             foreground_color: HexColor::new("#FFFFFF"),
             border: Border::new()
                 .visible(true)
-                .padding(2)
-                .width(2)
+                .padding(1)
+                .width(1)
                 .color(HexColor::new("#FF0BB0"))
                 .border_type(BorderType::Dotted)
                 .border_char('X')
@@ -65,6 +65,8 @@ impl BaseLayer {
 fn main() {
     let _clean_up = CleanUp; // Assign the CleanUp instance to _clean_up
     terminal::enable_raw_mode().expect("Unable to enable raw mode");
+    execute!(io::stdout(), terminal::EnterAlternateScreen)
+        .expect("Unable to enter alternate screen");
 
     // Create a new BaseLayer instance
     match BaseLayer::new() {
@@ -72,7 +74,7 @@ fn main() {
             // Render a border around the window
             base_layer
                 .border
-                .render(base_layer.window_size)
+                .render(base_layer.window_size, true)
                 .expect("Failed to render border");
 
             std::thread::sleep(std::time::Duration::from_secs(5));
@@ -86,4 +88,7 @@ fn main() {
             eprintln!("Failed to initialize Base Layer: {}", e);
         }
     }
+
+    execute!(io::stdout(), terminal::LeaveAlternateScreen)
+        .expect("Unable to leave alternate screen");
 }
