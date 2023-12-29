@@ -7,7 +7,7 @@ use crossterm::execute;
 use crossterm::terminal;
 use std::io::{self};
 
-use crate::border::{Border, BorderType};
+use crate::border::Border;
 use crate::color::HexColor;
 use crate::font::{FontStyle, TextAlignment};
 
@@ -41,14 +41,7 @@ impl BaseLayer {
             window_size,
             background_color: HexColor::new("#000000"),
             foreground_color: HexColor::new("#FFFFFF"),
-            border: Border::new()
-                .visible(true)
-                .padding(1)
-                .width(1)
-                .color(HexColor::new("#FF0BB0"))
-                .border_type(BorderType::Dotted)
-                .border_char('X')
-                .build(),
+            border: Border::new().build(),
             title: None,
             cursor_visibility: true,
             default_cursor_position: (0, 0),
@@ -74,7 +67,7 @@ fn main() {
             // Render a border around the window
             base_layer
                 .border
-                .render(base_layer.window_size, true)
+                .build_border(base_layer.window_size)
                 .expect("Failed to render border");
 
             std::thread::sleep(std::time::Duration::from_secs(5));
