@@ -46,7 +46,7 @@ impl Default for Border {
             visible: true,
             padding: 1,
             width: 1,
-            color: HexColor::new("#FFFFFF"), // Default color set to white
+            color: HexColor::new("#FEA837"), // Default color set to white
             border_type: BorderType::Solid,  // Default border type set to solid
             decoration_lines: DecorationLine {
                 omni_char: '\0',
@@ -66,6 +66,24 @@ impl Border {
         BorderBuilder {
             border: Border::default(),
         }
+    }
+
+    fn render_vertical_border(
+        &self,
+        handle: &mut io::StdoutLock,
+        y_axis: u16,
+        x_axis: u16,
+        right_x: usize,
+    ) -> Result<(), io::Error> {
+        queue!(handle, cursor::MoveTo(x_axis, y_axis))?;
+        queue!(handle, style::SetForegroundColor(self.color.to_color()))?; // Set the foreground color
+        queue!(handle, style::Print(self.decoration_lines.vertical_char))?;
+        queue!(handle, style::SetForegroundColor(style::Color::Reset))?; // Reset the color
+        queue!(handle, cursor::MoveTo(right_x as u16, y_axis))?;
+        queue!(handle, style::SetForegroundColor(self.color.to_color()))?; // Set the foreground color
+        queue!(handle, style::Print(self.decoration_lines.vertical_char))?;
+        queue!(handle, style::SetForegroundColor(style::Color::Reset))?; // Reset the color
+        Ok(())
     }
 
     pub fn build_vertical_borders(&self, window_size: (usize, usize)) -> Result<(), io::Error> {
@@ -120,6 +138,36 @@ impl Border {
         Ok(())
     }
 
+    pub fn build_omni_char_border(&self, window_size: (usize, usize)) -> Result<(), io::Error> {
+        if self.decoration_lines.omni_char == '\0' {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Omni character not provided",
+            ));
+        }
+
+        let (width, height) = (window_size.0, window_size.1);
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
+
+        for x_axis in 0..width {
+            queue!(handle, cursor::MoveTo(x_axis as u16, 0))?;
+            queue!(handle, style::Print(self.decoration_lines.omni_char))?;
+            queue!(handle, cursor::MoveTo(x_axis as u16, (height - 1) as u16))?;
+            queue!(handle, style::Print(self.decoration_lines.omni_char))?;
+        }
+
+        for y_axis in 1..(height - 1) {
+            queue!(handle, cursor::MoveTo(0, y_axis as u16))?;
+            queue!(handle, style::Print(self.decoration_lines.omni_char))?;
+            queue!(handle, cursor::MoveTo((width - 1) as u16, y_axis as u16))?;
+            queue!(handle, style::Print(self.decoration_lines.omni_char))?;
+        }
+
+        handle.flush()?;
+        Ok(())
+    }
+
     pub fn build_corner_borders(&self, window_size: (usize, usize)) -> Result<(), io::Error> {
         let (width, height) = (window_size.0, window_size.1);
         let stdout = io::stdout();
@@ -161,28 +209,14 @@ impl Border {
         Ok(())
     }
 
-    fn render_vertical_border(
-        &self,
-        handle: &mut io::StdoutLock,
-        y_axis: u16,
-        x: u16,
-        right_x: usize,
-    ) -> Result<(), io::Error> {
-        queue!(handle, cursor::MoveTo(x, y_axis))?;
-        queue!(handle, style::Print(self.decoration_lines.vertical_char))?;
-        queue!(handle, cursor::MoveTo(right_x as u16, y_axis))?;
-        queue!(handle, style::Print(self.decoration_lines.vertical_char))?;
-        Ok(())
-    }
-
     fn render_horizontal_border(
         &self,
         handle: &mut io::StdoutLock,
         x_axis: u16,
-        y: u16,
+        y_axis: u16,
         bottom_y: usize,
     ) -> Result<(), io::Error> {
-        queue!(handle, cursor::MoveTo(x_axis, y))?;
+        queue!(handle, cursor::MoveTo(x_axis, y_axis))?;
         queue!(handle, style::Print(self.decoration_lines.horizontal_char))?;
         queue!(handle, cursor::MoveTo(x_axis, bottom_y as u16))?;
         queue!(handle, style::Print(self.decoration_lines.horizontal_char))?;
@@ -192,24 +226,24 @@ impl Border {
     fn render_corner_char(
         &self,
         handle: &mut io::StdoutLock,
-        x: usize,
-        y: usize,
+        x_axis: usize,
+        y_axis: usize,
         char: char,
     ) -> Result<(), io::Error> {
-        queue!(handle, cursor::MoveTo(x as u16, y as u16))?;
+        queue!(handle, cursor::MoveTo(x_axis as u16, y_axis as u16))?;
         queue!(handle, style::Print(char))?;
         Ok(())
     }
 
-    fn check_current_position_is_padding(&self, x: usize, y: usize) -> bool {
-        (x < self.padding)
-            || (y < self.padding)
-            || (x >= self.width - self.padding)
-            || (y >= self.width - self.padding)
+    fn check_current_position_is_padding(&self, x_axis: usize, y_axis: usize) -> bool {
+        (x_axis < self.padding)
+            || (y_axis < self.padding)
+            || (x_axis >= self.width - self.padding)
+            || (y_axis >= self.width - self.padding)
     }
 
-    fn should_render_border(&self, x: usize, y: usize) -> bool {
-        !self.check_current_position_is_padding(x, y) && self.visible
+    fn should_render_border(&self, x_axis: usize, y_axis: usize) -> bool {
+        !self.check_current_position_is_padding(x_axis, y_axis) && self.visible
     }
 
     fn check_border_type(&self) -> BorderType {
@@ -222,6 +256,12 @@ pub struct BorderBuilder {
 }
 
 impl BorderBuilder {
+    pub fn new() -> Self {
+        BorderBuilder {
+            border: Border::default(),
+        }
+    }
+
     pub fn padding(mut self, padding: usize) -> Self {
         self.border.padding = padding;
         self
