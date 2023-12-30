@@ -10,7 +10,7 @@ impl HexColor {
     }
 
     // Convert HexColor to crossterm's Color
-    pub fn to_color(&self) -> crossterm::style::Color {
+    pub fn to_rgb(&self) -> crossterm::style::Color {
         // Assuming the HexColor is in the format '#RRGGBB'
         let r = u8::from_str_radix(&self.code[1..3], 16).unwrap_or(0);
         let g = u8::from_str_radix(&self.code[3..5], 16).unwrap_or(0);
