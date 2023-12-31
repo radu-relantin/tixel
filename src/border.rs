@@ -19,7 +19,7 @@ pub enum BorderType {
 // Define the properties and structure of a border
 pub struct Border {
     visible: bool,                    // Indicates if the border is visible
-    padding: usize,                   // Padding around the border
+    padding: usize,                   // Padding between the edge and the 1st border layer
     width: usize,                     // Width of the border
     color: HexColor,                  // Color of the border
     border_type: BorderType,          // Type of the border
@@ -29,13 +29,13 @@ pub struct Border {
 
 // Define the decoration lines for rendering the border
 pub struct DecorationLine {
-    omni_char: char,                // Character used to render the border
-    vertical_char: Vec<char>,       // Vertical character for rendering
-    horizontal_char: Vec<char>,     // Horizontal character for rendering
-    top_right_corner_char: char,    // Character for the top right corner of the border
-    top_left_corner_char: char,     // Character for the top left corner of the border
-    bottom_right_corner_char: char, // Character for the bottom right corner of the border
-    bottom_left_corner_char: char,  // Character for the bottom left corner of the border
+    omni_char: char,                     // Character used to render the border
+    vertical_char: Vec<char>,            // Vertical character for rendering
+    horizontal_char: Vec<char>,          // Horizontal character for rendering
+    top_right_corner_char: Vec<char>,    // Character for the top right corner of the border
+    top_left_corner_char: Vec<char>,     // Character for the top left corner of the border
+    bottom_right_corner_char: Vec<char>, // Character for the bottom right corner of the border
+    bottom_left_corner_char: Vec<char>,  // Character for the bottom left corner of the border
 }
 
 // Implement the default values for the Border structure
@@ -52,10 +52,10 @@ impl Default for Border {
                 omni_char: '\0',
                 vertical_char: vec!['│'; 1],
                 horizontal_char: vec!['─'; 1],
-                top_right_corner_char: '┐',
-                top_left_corner_char: '┌',
-                bottom_right_corner_char: '┘',
-                bottom_left_corner_char: '└',
+                top_right_corner_char: vec!['┐'; 1],
+                top_left_corner_char: vec!['┌'; 1],
+                bottom_right_corner_char: vec!['┘'; 1],
+                bottom_left_corner_char: vec!['└'; 1],
             },
         }
     }
@@ -265,74 +265,83 @@ impl Border {
         Ok(())
     }
 
-    pub fn build_omni_char_border(&self, window_size: (usize, usize)) -> Result<(), io::Error> {
-        if self.decoration_lines.omni_char == '\0' {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Omni character not provided",
-            ));
-        }
+    fn render_corner(
+        &self,
+        handle: &mut io::StdoutLock,
+        x_axis: u16,
+        y_axis: u16,
+        corner_char: char,
+        layer: usize,
+    ) -> Result<(), io::Error> {
+        queue!(handle, cursor::MoveTo(x_axis, y_axis))?;
+        queue!(
+            handle,
+            style::SetForegroundColor(self.get_border_color(layer).to_rgb())
+        )?;
+        queue!(handle, style::Print(corner_char))?;
+        queue!(handle, style::SetForegroundColor(style::Color::Reset))?;
+        Ok(())
+    }
 
-        let (width, height) = (window_size.0, window_size.1);
+    fn render_corners(&self, window_size: (usize, usize)) -> Result<(), io::Error> {
+        let (width, height) = window_size;
+
         let stdout = io::stdout();
         let mut handle = stdout.lock();
 
-        for x_axis in 0..width {
-            queue!(handle, cursor::MoveTo(x_axis as u16, 0))?;
-            queue!(handle, style::Print(self.decoration_lines.omni_char))?;
-            queue!(handle, cursor::MoveTo(x_axis as u16, (height - 1) as u16))?;
-            queue!(handle, style::Print(self.decoration_lines.omni_char))?;
-        }
+        for layer in 0..self.width {
+            let top_y = self.padding as u16 + layer as u16;
+            let bottom_y = height as u16 - self.padding as u16 - 1 - layer as u16;
+            let left_x = self.padding as u16 + layer as u16;
+            let right_x = width as u16 - self.padding as u16 - 1 - layer as u16;
 
-        for y_axis in 1..(height - 1) {
-            queue!(handle, cursor::MoveTo(0, y_axis as u16))?;
-            queue!(handle, style::Print(self.decoration_lines.omni_char))?;
-            queue!(handle, cursor::MoveTo((width - 1) as u16, y_axis as u16))?;
-            queue!(handle, style::Print(self.decoration_lines.omni_char))?;
+            if top_y >= height as u16
+                || bottom_y >= height as u16
+                || left_x >= width as u16
+                || right_x >= width as u16
+            {
+                break;
+            }
+
+            let top_left_char = self
+                .decoration_lines
+                .top_left_corner_char
+                .get(layer)
+                .copied()
+                .unwrap_or('┌');
+            let top_right_char = self
+                .decoration_lines
+                .top_right_corner_char
+                .get(layer)
+                .copied()
+                .unwrap_or('┐');
+            let bottom_left_char = self
+                .decoration_lines
+                .bottom_left_corner_char
+                .get(layer)
+                .copied()
+                .unwrap_or('└');
+            let bottom_right_char = self
+                .decoration_lines
+                .bottom_right_corner_char
+                .get(layer)
+                .copied()
+                .unwrap_or('┘');
+
+            self.render_corner(&mut handle, left_x, top_y, top_left_char, layer)?;
+            self.render_corner(&mut handle, right_x, top_y, top_right_char, layer)?;
+            self.render_corner(&mut handle, left_x, bottom_y, bottom_left_char, layer)?;
+            self.render_corner(&mut handle, right_x, bottom_y, bottom_right_char, layer)?;
         }
 
         handle.flush()?;
         Ok(())
     }
 
-    pub fn build_corner_borders(&self, window_size: (usize, usize)) -> Result<(), io::Error> {
-        let (width, height) = (window_size.0, window_size.1);
-        let stdout = io::stdout();
-        let mut handle = stdout.lock();
-
-        self.render_corner_char(
-            &mut handle,
-            self.padding,
-            self.padding,
-            self.decoration_lines.top_left_corner_char,
-        )?;
-        self.render_corner_char(
-            &mut handle,
-            width - self.padding - 1,
-            self.padding,
-            self.decoration_lines.top_right_corner_char,
-        )?;
-        self.render_corner_char(
-            &mut handle,
-            self.padding,
-            height - self.padding - 1,
-            self.decoration_lines.bottom_left_corner_char,
-        )?;
-        self.render_corner_char(
-            &mut handle,
-            width - self.padding - 1,
-            height - self.padding - 1,
-            self.decoration_lines.bottom_right_corner_char,
-        )?;
-
-        handle.flush()?;
-        Ok(())
-    }
-
-    pub fn render_border(&self, window_size: (usize, usize)) -> Result<(), io::Error> {
+    pub fn render_box(&self, window_size: (usize, usize)) -> Result<(), io::Error> {
         self.render_vertical_borders(window_size)?;
         self.render_horizontal_borders(window_size)?;
-        // self.build_corner_borders(window_size)?;
+        self.render_corners(window_size)?;
         Ok(())
     }
 
@@ -350,19 +359,6 @@ impl Border {
             style::SetForegroundColor(self.get_border_color(layer).to_rgb())
         )?;
         queue!(handle, style::Print(border_char))?;
-        queue!(handle, style::SetForegroundColor(style::Color::Reset))?;
-        Ok(())
-    }
-    fn render_corner_char(
-        &self,
-        handle: &mut io::StdoutLock,
-        x_axis: usize,
-        y_axis: usize,
-        char: char,
-    ) -> Result<(), io::Error> {
-        queue!(handle, cursor::MoveTo(x_axis as u16, y_axis as u16))?;
-        queue!(handle, style::SetForegroundColor(self.color.to_rgb()))?;
-        queue!(handle, style::Print(char))?;
         queue!(handle, style::SetForegroundColor(style::Color::Reset))?;
         Ok(())
     }
