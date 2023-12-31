@@ -50,8 +50,8 @@ impl Default for Border {
             border_colors: vec![HexColor::new("#FFFFFF")],
             decoration_lines: DecorationLine {
                 omni_char: '\0',
-                vertical_char: vec!['│'; 1],
-                horizontal_char: vec!['─'; 1],
+                vertical_char: vec![Self::default_vertical_border_char(BorderType::Solid)],
+                horizontal_char: vec![Self::default_horizontal_border_char(BorderType::Solid)],
                 top_right_corner_char: vec!['┐'; 1],
                 top_left_corner_char: vec!['┌'; 1],
                 bottom_right_corner_char: vec!['┘'; 1],
@@ -77,14 +77,38 @@ impl Border {
         })
     }
 
+    fn default_vertical_border_char(border_type: BorderType) -> char {
+        match border_type {
+            BorderType::Solid => '│',
+            BorderType::Dotted => '┆',
+            BorderType::Dashed => '┊',
+            BorderType::Double => '║',
+        }
+    }
+
+    fn default_horizontal_border_char(border_type: BorderType) -> char {
+        match border_type {
+            BorderType::Solid => '─',
+            BorderType::Dotted => '┄',
+            BorderType::Dashed => '┈',
+            BorderType::Double => '═',
+        }
+    }
+
     fn render_vertical_border(
         &self,
         handle: &mut io::StdoutLock,
         y_axis: u16,
         start_x: u16,
-        border_char: char,
         layer: usize,
     ) -> Result<(), io::Error> {
+        let border_char = self
+            .decoration_lines
+            .vertical_char
+            .get(layer)
+            .copied()
+            .unwrap_or_else(|| Self::default_vertical_border_char(self.border_type));
+
         queue!(handle, cursor::MoveTo(start_x, y_axis))?;
         queue!(
             handle,
@@ -118,7 +142,7 @@ impl Border {
                     .get(layer)
                     .copied()
                     .unwrap_or('│');
-                self.render_vertical_border(handle, y_axis, x_axis, border_char, layer)?;
+                self.render_vertical_border(handle, y_axis, x_axis, layer)?;
             }
         }
         Ok(())
@@ -146,7 +170,7 @@ impl Border {
             };
 
             for y_axis in y_start..y_end {
-                self.render_vertical_border(handle, y_axis, x_axis, border_char, layer)?;
+                self.render_vertical_border(handle, y_axis, x_axis, layer)?;
             }
         }
         Ok(())
@@ -202,7 +226,7 @@ impl Border {
                 .unwrap_or('─');
 
             for x_axis in x_start..x_end {
-                self.render_horizontal_border(handle, x_axis, y_axis, border_char, layer)?;
+                self.render_horizontal_border(handle, x_axis, y_axis, layer)?;
             }
         }
         Ok(())
@@ -232,7 +256,7 @@ impl Border {
                 .unwrap_or('─');
 
             for x_axis in x_start..x_end {
-                self.render_horizontal_border(handle, x_axis, y_axis, border_char, layer)?;
+                self.render_horizontal_border(handle, x_axis, y_axis, layer)?;
             }
         }
         Ok(())
@@ -350,9 +374,15 @@ impl Border {
         handle: &mut io::StdoutLock,
         x_axis: u16,
         start_y: u16,
-        border_char: char,
         layer: usize,
     ) -> Result<(), io::Error> {
+        let border_char = self
+            .decoration_lines
+            .horizontal_char
+            .get(layer)
+            .copied()
+            .unwrap_or_else(|| Self::default_horizontal_border_char(self.border_type));
+
         queue!(handle, cursor::MoveTo(x_axis, start_y))?;
         queue!(
             handle,
@@ -407,6 +437,10 @@ impl BorderBuilder {
 
     pub fn border_type(mut self, border_type: BorderType) -> Self {
         self.border.border_type = border_type;
+        self.border.decoration_lines.vertical_char =
+            vec![Border::default_vertical_border_char(border_type); self.border.width];
+        self.border.decoration_lines.horizontal_char =
+            vec![Border::default_horizontal_border_char(border_type); self.border.width];
         self
     }
 
@@ -420,6 +454,23 @@ impl BorderBuilder {
             panic!("Number of colors provided exceeds border width");
         }
         self.border.border_colors = colors;
+        self
+    }
+
+    pub fn border_char(mut self, border_char: char) -> Self {
+        self.border.decoration_lines.vertical_char = vec![border_char];
+        self
+    }
+
+    pub fn vertical_border_char(mut self, chars: Vec<char>) -> Self {
+        // NOTE: Must be equal to the border width
+        self.border.decoration_lines.vertical_char = chars;
+        self
+    }
+
+    pub fn horizontal_border_char(mut self, chars: Vec<char>) -> Self {
+        // NOTE: Must be equal to the border width
+        self.border.decoration_lines.horizontal_char = chars;
         self
     }
 
