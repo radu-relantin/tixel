@@ -52,10 +52,14 @@ impl Default for Border {
                 omni_char: '\0',
                 vertical_char: vec![Self::default_vertical_border_char(BorderType::Solid)],
                 horizontal_char: vec![Self::default_horizontal_border_char(BorderType::Solid)],
-                top_right_corner_char: vec!['┐'; 1],
-                top_left_corner_char: vec!['┌'; 1],
-                bottom_right_corner_char: vec!['┘'; 1],
-                bottom_left_corner_char: vec!['└'; 1],
+                top_right_corner_char: vec![Self::default_top_right_corner_char(BorderType::Solid)],
+                top_left_corner_char: vec![Self::default_top_left_corner_char(BorderType::Solid)],
+                bottom_right_corner_char: vec![Self::default_bottom_right_corner_char(
+                    BorderType::Solid,
+                )],
+                bottom_left_corner_char: vec![Self::default_bottom_left_corner_char(
+                    BorderType::Solid,
+                )],
             },
         }
     }
@@ -75,6 +79,42 @@ impl Border {
                 .cloned()
                 .unwrap_or_else(|| HexColor::new("#FFFFFF"))
         })
+    }
+
+    fn default_top_right_corner_char(border_type: BorderType) -> char {
+        match border_type {
+            BorderType::Solid => '┐',
+            BorderType::Dotted => '┒',
+            BorderType::Dashed => '┎',
+            BorderType::Double => '╗',
+        }
+    }
+
+    fn default_top_left_corner_char(border_type: BorderType) -> char {
+        match border_type {
+            BorderType::Solid => '┌',
+            BorderType::Dotted => '┎',
+            BorderType::Dashed => '┍',
+            BorderType::Double => '╔',
+        }
+    }
+
+    fn default_bottom_right_corner_char(border_type: BorderType) -> char {
+        match border_type {
+            BorderType::Solid => '┘',
+            BorderType::Dotted => '┚',
+            BorderType::Dashed => '┖',
+            BorderType::Double => '╝',
+        }
+    }
+
+    fn default_bottom_left_corner_char(border_type: BorderType) -> char {
+        match border_type {
+            BorderType::Solid => '└',
+            BorderType::Dotted => '┖',
+            BorderType::Dashed => '┕',
+            BorderType::Double => '╚',
+        }
     }
 
     fn default_vertical_border_char(border_type: BorderType) -> char {
@@ -307,25 +347,25 @@ impl Border {
                 .top_left_corner_char
                 .get(layer)
                 .copied()
-                .unwrap_or('┌');
+                .unwrap_or_else(|| Self::default_top_left_corner_char(self.border_type));
             let top_right_char = self
                 .decoration_lines
                 .top_right_corner_char
                 .get(layer)
                 .copied()
-                .unwrap_or('┐');
+                .unwrap_or_else(|| Self::default_top_right_corner_char(self.border_type));
             let bottom_left_char = self
                 .decoration_lines
                 .bottom_left_corner_char
                 .get(layer)
                 .copied()
-                .unwrap_or('└');
+                .unwrap_or_else(|| Self::default_bottom_left_corner_char(self.border_type));
             let bottom_right_char = self
                 .decoration_lines
                 .bottom_right_corner_char
                 .get(layer)
                 .copied()
-                .unwrap_or('┘');
+                .unwrap_or_else(|| Self::default_bottom_right_corner_char(self.border_type));
 
             self.render_corner(&mut handle, left_x, top_y, top_left_char, layer)?;
             self.render_corner(&mut handle, right_x, top_y, top_right_char, layer)?;
@@ -412,10 +452,22 @@ impl BorderBuilder {
 
     pub fn border_type(mut self, border_type: BorderType) -> Self {
         self.border.border_type = border_type;
+
         self.border.decoration_lines.vertical_char =
             vec![Border::default_vertical_border_char(border_type); self.border.width];
+
         self.border.decoration_lines.horizontal_char =
             vec![Border::default_horizontal_border_char(border_type); self.border.width];
+
+        self.border.decoration_lines.top_left_corner_char =
+            vec![Border::default_top_left_corner_char(border_type); self.border.width];
+        self.border.decoration_lines.top_right_corner_char =
+            vec![Border::default_top_right_corner_char(border_type); self.border.width];
+        self.border.decoration_lines.bottom_left_corner_char =
+            vec![Border::default_bottom_left_corner_char(border_type); self.border.width];
+        self.border.decoration_lines.bottom_right_corner_char =
+            vec![Border::default_bottom_right_corner_char(border_type); self.border.width];
+
         self
     }
 
