@@ -136,12 +136,6 @@ impl Border {
             }
 
             for y_axis in y_start..y_end {
-                let border_char = self
-                    .decoration_lines
-                    .vertical_char
-                    .get(layer)
-                    .copied()
-                    .unwrap_or('│');
                 self.render_vertical_border(handle, y_axis, x_axis, layer)?;
             }
         }
@@ -163,11 +157,6 @@ impl Border {
             if y_start >= y_end {
                 break;
             }
-
-            let border_char = match self.decoration_lines.vertical_char.get(layer) {
-                Some(&c) => c,
-                None => self.decoration_lines.vertical_char[0],
-            };
 
             for y_axis in y_start..y_end {
                 self.render_vertical_border(handle, y_axis, x_axis, layer)?;
@@ -218,13 +207,6 @@ impl Border {
                 break;
             }
 
-            let border_char = self
-                .decoration_lines
-                .horizontal_char
-                .get(layer)
-                .copied()
-                .unwrap_or('─');
-
             for x_axis in x_start..x_end {
                 self.render_horizontal_border(handle, x_axis, y_axis, layer)?;
             }
@@ -247,13 +229,6 @@ impl Border {
             if x_start >= x_end {
                 break;
             }
-
-            let border_char = self
-                .decoration_lines
-                .horizontal_char
-                .get(layer)
-                .copied()
-                .unwrap_or('─');
 
             for x_axis in x_start..x_end {
                 self.render_horizontal_border(handle, x_axis, y_axis, layer)?;
