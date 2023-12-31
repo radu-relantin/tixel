@@ -43,6 +43,7 @@ impl BaseLayer {
             foreground_color: HexColor::new("#FFFFFF"),
             border: Border::new()
                 .width(3)
+                // .with_color(HexColor::new("#5DC5E3"))
                 .with_colors(vec![
                     HexColor::new("#FEA837"),
                     HexColor::new("#5DC5E3"),
@@ -74,10 +75,10 @@ fn main() {
             // Render a border around the window
             base_layer
                 .border
-                .render_vertical_borders(base_layer.window_size)
+                .render_border(base_layer.window_size)
                 .expect("Failed to render border");
 
-            std::thread::sleep(std::time::Duration::from_secs(20));
+            std::thread::sleep(std::time::Duration::from_secs(3));
             // Print the window size
             println!(
                 "Window size: {} columns, {} rows",

@@ -31,7 +31,7 @@ pub struct Border {
 pub struct DecorationLine {
     omni_char: char,                // Character used to render the border
     vertical_char: Vec<char>,       // Vertical character for rendering
-    horizontal_char: char,          // Horizontal character for rendering
+    horizontal_char: Vec<char>,     // Horizontal character for rendering
     top_right_corner_char: char,    // Character for the top right corner of the border
     top_left_corner_char: char,     // Character for the top left corner of the border
     bottom_right_corner_char: char, // Character for the bottom right corner of the border
@@ -51,7 +51,7 @@ impl Default for Border {
             decoration_lines: DecorationLine {
                 omni_char: '\0',
                 vertical_char: vec!['│'; 1],
-                horizontal_char: '─',
+                horizontal_char: vec!['─'; 1],
                 top_right_corner_char: '┐',
                 top_left_corner_char: '┌',
                 bottom_right_corner_char: '┘',
@@ -178,28 +178,89 @@ impl Border {
         Ok(())
     }
 
-    pub fn build_horizontal_borders(&self, window_size: (usize, usize)) -> Result<(), io::Error> {
-        if self.decoration_lines.omni_char != '\0' {
-            return Ok(());
-        } else if self.decoration_lines.horizontal_char == '\0' {
+    fn render_top_horizontal_border(
+        &self,
+        handle: &mut io::StdoutLock,
+        window_size: (usize, usize),
+    ) -> Result<(), io::Error> {
+        let (width, _) = window_size;
+
+        for layer in 0..self.width {
+            let x_start = self.padding as u16 + layer as u16 + 1;
+            let x_end = width as u16 - self.padding as u16 - layer as u16 - 1;
+            let y_axis = self.padding as u16 + layer as u16;
+
+            if x_start >= x_end {
+                break;
+            }
+
+            let border_char = self
+                .decoration_lines
+                .horizontal_char
+                .get(layer)
+                .copied()
+                .unwrap_or('─');
+
+            for x_axis in x_start..x_end {
+                self.render_horizontal_border(handle, x_axis, y_axis, border_char, layer)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn render_bottom_horizontal_border(
+        &self,
+        handle: &mut io::StdoutLock,
+        window_size: (usize, usize),
+    ) -> Result<(), io::Error> {
+        let (width, height) = window_size;
+
+        for layer in 0..self.width {
+            let x_start = self.padding as u16 + layer as u16 + 1;
+            let x_end = width as u16 - self.padding as u16 - layer as u16 - 1;
+            let y_axis = height as u16 - self.padding as u16 - 1 - layer as u16;
+
+            if x_start >= x_end {
+                break;
+            }
+
+            let border_char = self
+                .decoration_lines
+                .horizontal_char
+                .get(layer)
+                .copied()
+                .unwrap_or('─');
+
+            for x_axis in x_start..x_end {
+                self.render_horizontal_border(handle, x_axis, y_axis, border_char, layer)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn render_horizontal_borders(&self, window_size: (usize, usize)) -> Result<(), io::Error> {
+        if self.width == 0 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "Horizontal character not provided",
+                "Border width cannot be 0",
             ));
         }
 
-        let (width, height) = (window_size.0, window_size.1);
+        if self.decoration_lines.omni_char != '\0'
+            || self.decoration_lines.horizontal_char.is_empty()
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Appropriate horizontal character not provided",
+            ));
+        }
+
         let stdout = io::stdout();
         let mut handle = stdout.lock();
 
-        for x_axis in self.padding + 1..width - self.padding - 1 {
-            self.render_horizontal_border(
-                &mut handle,
-                x_axis as u16,
-                self.padding as u16,
-                height - self.padding - 1,
-            )?;
-        }
+        self.render_top_horizontal_border(&mut handle, window_size)?;
+        self.render_bottom_horizontal_border(&mut handle, window_size)?;
+
         handle.flush()?;
         Ok(())
     }
@@ -268,10 +329,10 @@ impl Border {
         Ok(())
     }
 
-    pub fn build_border(&self, window_size: (usize, usize)) -> Result<(), io::Error> {
+    pub fn render_border(&self, window_size: (usize, usize)) -> Result<(), io::Error> {
         self.render_vertical_borders(window_size)?;
-        self.build_horizontal_borders(window_size)?;
-        self.build_corner_borders(window_size)?;
+        self.render_horizontal_borders(window_size)?;
+        // self.build_corner_borders(window_size)?;
         Ok(())
     }
 
@@ -279,20 +340,19 @@ impl Border {
         &self,
         handle: &mut io::StdoutLock,
         x_axis: u16,
-        y_axis: u16,
-        bottom_y: usize,
+        start_y: u16,
+        border_char: char,
+        layer: usize,
     ) -> Result<(), io::Error> {
-        queue!(handle, cursor::MoveTo(x_axis, y_axis))?;
-        queue!(handle, style::SetForegroundColor(self.color.to_rgb()))?;
-        queue!(handle, style::Print(self.decoration_lines.horizontal_char))?;
-        queue!(handle, style::SetForegroundColor(style::Color::Reset))?;
-        queue!(handle, cursor::MoveTo(x_axis, bottom_y as u16))?;
-        queue!(handle, style::SetForegroundColor(self.color.to_rgb()))?;
-        queue!(handle, style::Print(self.decoration_lines.horizontal_char))?;
+        queue!(handle, cursor::MoveTo(x_axis, start_y))?;
+        queue!(
+            handle,
+            style::SetForegroundColor(self.get_border_color(layer).to_rgb())
+        )?;
+        queue!(handle, style::Print(border_char))?;
         queue!(handle, style::SetForegroundColor(style::Color::Reset))?;
         Ok(())
     }
-
     fn render_corner_char(
         &self,
         handle: &mut io::StdoutLock,
