@@ -24,6 +24,7 @@ pub struct Border {
     color: HexColor,                  // Color of the border
     border_type: BorderType,          // Type of the border
     decoration_lines: DecorationLine, // Decoration lines for rendering the border
+    border_colors: Vec<HexColor>,     // Store multiple colors for different border layers
 }
 
 // Define the decoration lines for rendering the border
@@ -46,6 +47,7 @@ impl Default for Border {
             width: 1,
             color: HexColor::new("#FFFFFF"), // Default color set to white
             border_type: BorderType::Solid,  // Default border type set to solid
+            border_colors: vec![HexColor::new("#FFFFFF")],
             decoration_lines: DecorationLine {
                 omni_char: '\0',
                 vertical_char: vec!['│'; 1],
@@ -65,15 +67,29 @@ impl Border {
             border: Border::default(),
         }
     }
+
+    fn get_border_color(&self, layer: usize) -> HexColor {
+        self.border_colors.get(layer).cloned().unwrap_or_else(|| {
+            self.border_colors
+                .last()
+                .cloned()
+                .unwrap_or_else(|| HexColor::new("#FFFFFF"))
+        })
+    }
+
     fn render_vertical_border(
         &self,
         handle: &mut io::StdoutLock,
         y_axis: u16,
         start_x: u16,
         border_char: char,
+        layer: usize,
     ) -> Result<(), io::Error> {
         queue!(handle, cursor::MoveTo(start_x, y_axis))?;
-        queue!(handle, style::SetForegroundColor(self.color.to_rgb()))?;
+        queue!(
+            handle,
+            style::SetForegroundColor(self.get_border_color(layer).to_rgb())
+        )?;
         queue!(handle, style::Print(border_char))?;
         queue!(handle, style::SetForegroundColor(style::Color::Reset))?;
         Ok(())
@@ -102,7 +118,7 @@ impl Border {
                     .get(layer)
                     .copied()
                     .unwrap_or('│');
-                self.render_vertical_border(handle, y_axis, x_axis, border_char)?;
+                self.render_vertical_border(handle, y_axis, x_axis, border_char, layer)?;
             }
         }
         Ok(())
@@ -130,23 +146,13 @@ impl Border {
             };
 
             for y_axis in y_start..y_end {
-                self.render_vertical_border(handle, y_axis, x_axis, border_char)?;
+                self.render_vertical_border(handle, y_axis, x_axis, border_char, layer)?;
             }
         }
         Ok(())
     }
 
-    fn render_vertical_borders(
-        &self,
-        handle: &mut io::StdoutLock,
-        window_size: (usize, usize),
-    ) -> Result<(), io::Error> {
-        self.render_left_vertical_border(handle, window_size)?;
-        self.render_right_vertical_border(handle, window_size)?;
-        Ok(())
-    }
-
-    pub fn build_vertical_borders(&self, window_size: (usize, usize)) -> Result<(), io::Error> {
+    pub fn render_vertical_borders(&self, window_size: (usize, usize)) -> Result<(), io::Error> {
         if self.width == 0 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -165,7 +171,8 @@ impl Border {
         let stdout = io::stdout();
         let mut handle = stdout.lock();
 
-        self.render_vertical_borders(&mut handle, window_size)?;
+        self.render_left_vertical_border(&mut handle, window_size)?;
+        self.render_right_vertical_border(&mut handle, window_size)?;
 
         handle.flush()?;
         Ok(())
@@ -262,7 +269,7 @@ impl Border {
     }
 
     pub fn build_border(&self, window_size: (usize, usize)) -> Result<(), io::Error> {
-        self.build_vertical_borders(window_size)?;
+        self.render_vertical_borders(window_size)?;
         self.build_horizontal_borders(window_size)?;
         self.build_corner_borders(window_size)?;
         Ok(())
@@ -344,6 +351,19 @@ impl BorderBuilder {
 
     pub fn border_type(mut self, border_type: BorderType) -> Self {
         self.border.border_type = border_type;
+        self
+    }
+
+    pub fn with_color(mut self, color: HexColor) -> Self {
+        self.border.border_colors = vec![color];
+        self
+    }
+
+    pub fn with_colors(mut self, colors: Vec<HexColor>) -> Self {
+        if colors.len() > self.border.width {
+            panic!("Number of colors provided exceeds border width");
+        }
+        self.border.border_colors = colors;
         self
     }
 
